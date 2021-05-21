@@ -8,7 +8,9 @@ validTags = ["<" ++ c ++ ">" | c <- plainTags] ++ ["</" ++ c ++ ">" | c <- plain
 {- Stack implementation using lists -}
 empty = []
 push x xs = xs ++ [x]
+pop [] = []
 pop xs = init xs
+peek [] = []
 peek s = last s
 
 
@@ -23,7 +25,7 @@ main = do
     if countInvalidTags extractedTags > 0
         then error "There are invalid tags in the HTML Document"
     else
-        if check extractedTags [] == [] 
+        if check 0 0 0 extractedTags [] == [] 
             then print "Parsed Succesfully"
             else print extractedTags
 
@@ -42,29 +44,41 @@ auxIdent tag stack = do
 
 
 
+{- 
 identCheck (x:xs) myStack = do
     let myStack = auxIdent x myStack
-    print myStack
-
-
-check (tag:tags) stack = do
-  if (tag == "<br>" || tag == "<hr>")
+      if (tag == "<br>" || tag == "<hr>")
       then check tags stack
       else
-        if tag == closeTag tag 
-            then
-            if peek stack == openTag tag then
-                if tags /= []
-                    then check tags (pop stack)
-                    else pop stack
-            else error "NOT PROPERLY IDENTENTED"
-            else
-            if tag == openTag tag
-                then
-                    if (tags /= [])
-                        then check tags (push tag stack)
-                        else push tag stack
-            else error "THERE ARE INVALID TAGS" 
+    print myStack -}
+
+checkRule numOfHtml numOfHead numOfBody tag tags stack = case tag of
+  "<html>" -> if numOfHtml == 0 then check 1 numOfHead numOfBody tags (push tag stack) else error "There are multiple html tags!"
+  "<head>" -> if numOfHead == 0 then check numOfHtml 1 numOfBody tags (push tag stack) else error "There are multiple head tags!"
+  "<br>" -> check numOfHtml numOfHead numOfBody tags stack
+  "<hr>" -> check numOfHtml numOfHead numOfBody tags stack
+  "<div>" -> if peek stack == "<p>" then error "A <div> tag cannot be nested inside a <p> tag." else check numOfHtml numOfHead numOfBody tags (push tag stack)
+  "<p>" -> if peek stack == "<p>" then error "A <p> tag cannot be nested inside a <p> tag." else check numOfHtml numOfHead numOfBody tags (push tag stack)
+  "<title>" -> if peek stack == "<head>" then check numOfHtml numOfHead numOfBody tags (push tag stack) else error "<title> tag is not in the <head> tag."
+  "<body>" -> if numOfHead == 1 then if numOfBody == 0 then check numOfHtml numOfHead 1 tags (push tag stack) else error "There are multiple <body> tags." else error "<body> tag does not come after <head> tag."
+  _ -> check numOfHtml numOfHead numOfBody tags (push tag stack)
+
+
+check numOfHtml numOfHead numOfBody (tag:tags) stack = do
+  if tag == closeTag tag 
+      then
+      if peek stack == openTag tag then
+          if tags /= []
+              then check numOfHtml numOfHead numOfBody tags (pop stack)
+              else if (numOfHead == 1 && numOfBody == 1 && numOfHtml == 1) then pop stack else if numOfBody /= 1 then error "There are no <body> tags in the document" else error "There are no <html> tags in the document"
+      else error (peek stack ++ " AND " ++ tag ++ " NOT NESTED CORRECTLY")
+      else
+      if tag == openTag tag
+          then
+              if (tags /= [])
+                  then checkRule numOfHtml numOfHead numOfBody tag tags stack
+                  else push tag stack
+      else error "THERE ARE INVALID TAGS" 
    
 
     
